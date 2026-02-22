@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 定義 Audit Log 的存放位置 -->
+    <property name="AUDIT_LOG_FILE" value="./logs/audit/audit.log" />
+    <springProperty scope="context" name="ENV" source="spring.profiles.active" defaultValue="dev"/>
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="dev"/>
+
+
+
+    <!-- 1. 原有的 RollingFileAppender (實際寫檔者) -->
+    <appender name="AUDIT_ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>./logs/audit/audit-${APP_NAME}-${ENV}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>./logs/audit/audit.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>200MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>{"Level": "%-5level", "thread": "%thread", "timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}", "message":%msg}%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="APP_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>./logs/audit/export-${APP_NAME}-${ENV}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>./logs/audit/export.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>200MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>{"Level": "%-5level", "thread": "%thread", "timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}", "message":%msg}%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 2. 定義 AsyncAppender (緩衝層) -->
+    <appender name="ASYNC_AUDIT" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- 關聯到真正的寫檔 Appender -->
+        <appender-ref ref="AUDIT_ROLLING" />
+
+        <!-- 隊列大小，預設 256 -->
+        <queueSize>512</queueSize>
+
+        <!-- 當隊列剩下 20% 容量時，是否丟棄 TRACE/DEBUG/INFO 級別的日誌。
+             設為 0 表示不丟棄任何日誌，保證稽核資料完整性 -->
+        <discardingThreshold>0</discardingThreshold>
+
+        <!-- 隊列滿時是否阻塞主執行緒。
+             false: 丟棄日誌不阻塞 (效能優先)
+             true: 阻塞直到有空間 (資料完整優先，建議用於稽核) -->
+        <neverBlock>true</neverBlock>
+
+        <!-- 停止應用時等待緩衝區寫完的時間 (毫秒) -->
+        <maxFlushTime>5000</maxFlushTime>
+    </appender>
+
+    <!-- 3. Logger 指向 AsyncAppender -->
+    <logger name="AUDIT_LOGGER" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_AUDIT" />
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="APP_LOG" />
+    </root>
+
+    <!-- 簡單的 <springProfile> 使用範例 -->
+    <springProfile name="dev">
+        <logger name="AUDIT_LOGGER" level="DEBUG" />
+        <root level="INFO"/>
+        <!-- 開發環境配置：例如輸出 DEBUG 等級日誌到控制台 -->
+    </springProfile>
+
+    <springProfile name="prod">
+        <logger name="AUDIT_LOGGER" level="INFO" />
+        <!-- 正式環境配置：例如輸出 INFO 等級日誌到檔案 -->
+    </springProfile>
+
+</configuration>
