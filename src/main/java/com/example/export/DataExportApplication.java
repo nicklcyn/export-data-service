@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class DataExportApplication {
 
 	public static void main(String[] args) {
-        SpringApplication.run(DataExportApplication.class, args);
+		SpringApplication.run(DataExportApplication.class, args);
 	}
 
 }
